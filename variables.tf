@@ -5,3 +5,7 @@ variable "cluster_name" {
 variable "subnet_ids" {
   type = list(string)
 }
+
+variable "host" {
+  type = string
+}

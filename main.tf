@@ -11,14 +11,11 @@ module "eks" {
   subnet_ids    = var.subnet_ids
 }
 
-module "alb" {
-  source       = "./modules/alb"
-  cluster_name = var.cluster_name
-  openid_arn   = module.eks.openid_arn
-  openid_url   = module.eks.openid_url
-
-  # providers = {
-  #   "gavinbunney/kubectl" = "gavinbunney/kubectl"
-  # }
+module "ingress_controller" {
+  source = "./modules/ingress_controller"
 }
 
+module "deployment" {
+  source = "./modules/deployment"
+  host   = var.host
+}
