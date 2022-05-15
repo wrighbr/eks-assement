@@ -36,9 +36,7 @@ resource "null_resource" "external_dns_service_account" {
     build_number = timestamp()
   }
   provisioner "local-exec" {
-    command     = <<EOT
-eksctl create iamserviceaccount --name external-dns --namespace external-dns --cluster ${var.cluster_name} --attach-policy-arn ${aws_iam_policy.external_dns.arn} --override-existing-serviceaccounts --approve
-EOT
+    command     = "eksctl create iamserviceaccount --name external-dns --namespace external-dns --cluster ${var.cluster_name} --attach-policy-arn ${aws_iam_policy.external_dns.arn} --override-existing-serviceaccounts --approve"
     interpreter = ["/bin/bash", "-c"]
   }
 }
