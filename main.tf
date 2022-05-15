@@ -12,10 +12,19 @@ module "eks" {
 }
 
 module "ingress_controller" {
-  source = "./modules/ingress_controller"
+  source       = "./modules/ingress_controller"
+  cluster_name = var.cluster_name
+}
+
+module "extranl_dns" {
+  source        = "./modules/dns"
+  cluster_name  = var.cluster_name
+  domain_filter = var.domain_filter
+  zone_id       = var.zone_id
 }
 
 module "deployment" {
   source = "./modules/deployment"
   host   = var.host
 }
+

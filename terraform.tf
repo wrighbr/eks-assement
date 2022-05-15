@@ -21,6 +21,15 @@ provider "aws" {
   region = "ap-southeast-2"
 }
 
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.eks_cluster_endpoint
+    token                  = module.eks.cluster_token
+    cluster_ca_certificate = base64decode(module.eks.eks_cluster_certificate_authority.0.data)
+  }
+}
+
+
 provider "kubectl" {
   host                   = module.eks.eks_cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.eks_cluster_certificate_authority.0.data)
