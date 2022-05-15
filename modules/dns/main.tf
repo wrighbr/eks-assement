@@ -43,58 +43,76 @@ EOT
   }
 }
 
-# resource "null_resource" "deploy_ex" {
-#   triggers = {
-#     build_number = timestamp()
-#   }
-#   provisioner "local-exec" {
-#     command     = <<EOT
-#       aws eks --region ap-southeast-2 update-kubeconfig --name "${var.cluster_name}"
-#       kubectl apply -f ${path.module}/deploy.yaml
-# EOT
-#     interpreter = ["/bin/bash", "-c"]
-#   }
-# }
+resource "kubectl_manifest" "external_dns_cluster_role" {
+  yaml_body = <<YAML
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-dns
+rules:
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get","watch","list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get","watch","list"]
+  - apiGroups: ["networking","networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get","watch","list"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get","watch","list"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get","watch","list"]
+YAML
+}
 
+resource "kubectl_manifest" "external_dns_cluster_role_binding" {
+  yaml_body = <<YAML
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-dns-viewer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-dns
+subjects:
+- kind: ServiceAccount
+  name: external-dns
+  namespace: default
+YAML
+}
 
-# resource "helm_release" "external_dns" {
-#   name       = "external-dns"
-#   repository = "https://charts.bitnami.com/bitnami"
-#   chart      = "external-dns"
-#   set {
-#     name  = "provider"
-#     value = "aws"
-#   }
-#   set {
-#     name  = "domainFilters[0]"
-#     value = var.domain_filter
-#   }
-#   set {
-#     name  = "policy"
-#     value = "sync"
-#   }
-#   set {
-#     name  = "registry"
-#     value = "txt"
-#   }
-#   set {
-#     name  = "txtOwnerId"
-#     value = var.zone_id
-#   }
-#   set {
-#     name  = "rbac.create"
-#     value = true
-#   }
-#   set {
-#     name  = "rbac.serviceAccountName"
-#     value = "external-dns"
-#   }
-#   set {
-#     name = "rbac.serviceAccountAnnotations.eks\.amazonaws\.com/role-arn"
-#     value = ""
-#   }
-
-#   depends_on = [
-#     null_resource.external_dns_service_account
-#   ]
-# }
+resource "kubectl_manifest" "external_dns_deployment" {
+  yaml_body = <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: external-dns
+  template:
+    metadata:
+      labels:
+        app: external-dns
+    spec:
+      containers:
+      - name: external-dns
+        image: k8s.gcr.io/external-dns/external-dns:v0.10.2
+        args:
+        - --source=service
+        - --source=ingress
+        - --domain-filter=${var.domain_filter}  # will make ExternalDNS see only the hosted zones matching provided domain, omit to process all available hosted zones
+        - --provider=aws
+        - --policy=upsert-only # would prevent ExternalDNS from deleting any records, omit to enable full synchronization
+        - --aws-zone-type=public # only look at public hosted zones (valid values are public, private or no value for both)
+        - --registry=txt
+        - --txt-owner-id=${var.zone_id}
+YAML
+}
